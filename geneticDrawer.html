@@ -1,0 +1,143 @@
+<html>
+	<head>
+        <meta charset="utf-8">
+        <title>Genetic Drawer</title>
+        <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+        <script type="text/javascript">
+        	$(document).ready(function()
+        	{
+        		var fileLoader = document.getElementById('fileLoader');
+				fileLoader.addEventListener('change', handleFiles);
+			});
+
+        	var MAX = {generation:4, x:512, y:512, r:200};
+        	var MUT = 5; // 0..100
+            var POPULATION = 512;
+            var ALPHA = 0.15;
+            var stop = false;
+            var ctx, ctx2, ctx3;
+            function rnd(max)
+        	{
+  				return Math.floor(Math.random() * (max));
+  			}
+  			function fitness(color, averange,averange2)
+  			{
+  				return Math.abs(averange.r-(averange2.r*(1-ALPHA)+color.r*ALPHA))+Math.abs(averange.g-(averange2.g*(1-ALPHA)+color.g*ALPHA))+Math.abs(averange.b-(averange2.b*(1-ALPHA)+color.b*ALPHA));
+  			}
+  			function makeChild(father, mother)
+  			{
+  				var mixProp = rnd(2)+1;
+  				if (mixProp == 1)
+  					return {r:father.r, g:mother.g, b:mother.b};
+  				return {r:father.r, g:father.g, b:mother.b};
+  			}
+  			function evolve(generation)
+  			{
+  				var newGeneration = [];
+  				while (newGeneration.length<POPULATION)
+  				{
+  					var father = rnd(POPULATION);
+  					var mother = rnd(POPULATION);
+  					while (father == mother)
+  					{
+  						father = rnd(POPULATION);
+  						mother = rnd(POPULATION);
+  					}
+  					if ((rnd(2*POPULATION)-father)>POPULATION && (rnd(2*POPULATION)-mother)>POPULATION)
+  						newGeneration = newGeneration.concat(makeChild(generation[father],generation[mother]));
+  				}
+  				return newGeneration;
+  			}
+  			function mutate(generation)
+  			{
+  				generation.forEach(function(val,i,g)
+  				{
+  					if (rnd(101)<= MUT)
+  						g[i].r = rnd(256);	
+  					if (rnd(101)<= MUT)
+  						g[i].g = rnd(256);
+  					if (rnd(101)<= MUT)
+  						g[i].b = rnd(256);
+  				});
+  				return generation;
+  			}
+  			function loop()
+  			{
+  				var r = {x:rnd(MAX.x),y:rnd(MAX.y),r:rnd(MAX.r)+1};
+  				var x,y,width;
+  				x = r.x-r.r;
+  				y = r.y-r.r;
+  				width = 2*r.r;
+  				var pix = ctx.getImageData(x,y,width,width).data;
+				var pix2 = ctx2.getImageData(x,y,width,width).data;
+				var sum = {r:0,g:0,b:0};
+				var sum2 = {r:0,g:0,b:0};
+				for (var i = 0, n = pix.length; i < n; i += 4)
+				{
+					sum.r += pix[i];
+					sum.g += pix[i+1];
+					sum.b += pix[i+2];
+					sum2.r += pix2[i];
+					sum2.g += pix2[i+1];
+					sum2.b += pix2[i+2];
+				}
+				var averange = {r:Math.floor(sum.r/(pix.length/4)), g:Math.floor(sum.g/(pix.length/4)), b:Math.floor(sum.b/(pix.length/4))};
+				var averange2 = {r:Math.floor(sum2.r/(pix2.length/4)), g:Math.floor(sum2.g/(pix2.length/4)), b:Math.floor(sum2.b/(pix2.length/4))};
+		    	var generation = [];
+            	for (var i=0;i<POPULATION;i++)
+            	{
+            		generation[i] = {r:rnd(256), g:rnd(256), b:rnd(256), a:ALPHA};
+            		generation[i].fitness = fitness(generation[i],averange,averange2);
+            	}
+            	generation.sort(function(a,b) {return a.fitness-b.fitness});
+			    for (var i=0;i<MAX.generation;i++)
+			    {
+			    	generation = evolve(generation);
+        			generation = mutate(generation);
+            		generation.forEach(function(val,i,g)
+            		{
+            			g[i].fitness = fitness(val,averange,averange2);
+            		});
+            		generation.sort(function(a,b) {return a.fitness-b.fitness});
+			    }
+			    ctx2.beginPath();
+			    ctx2.fillStyle = "rgba("+generation[0].r+","+generation[0].g+","+generation[0].b+","+ALPHA+")";
+				ctx2.arc(r.x, r.y, r.r, 0, 2*Math.PI, true);
+				ctx2.fill();
+				ctx2.closePath();
+				if (MAX.r>100)
+					MAX.r-=0.5;
+				else if (MAX.r>20)
+					MAX.r-=0.01;
+				else if (MAX.r>2)
+					MAX.r-=0.001;
+				if (!stop)
+				    setTimeout(function(){
+						loop();
+					},1);
+  			}
+
+			function handleFiles(e) {
+				stop = false;
+			    ctx = document.getElementById("sourceImg").getContext('2d');
+			    ctx2 = document.getElementById("targetImg").getContext('2d');
+			    var sourceImg = new Image;
+				sourceImg.src = URL.createObjectURL(e.target.files[0]);
+				sourceImg.onload = function()
+				{
+				    ctx.drawImage(sourceImg, 0,0,MAX.x,MAX.y);
+				    loop();
+				    
+				}
+			}
+        </script>
+    </head>
+    <body>
+    	<form>
+    		<input type="file" id="fileLoader" accept="image/*">
+    	</form>
+    	<canvas id="sourceImg" width="512" height="512"></canvas>
+    	<canvas id="targetImg" width="512" height="512"></canvas>
+    	<div id='err'></div>
+    </body>
+</html>
